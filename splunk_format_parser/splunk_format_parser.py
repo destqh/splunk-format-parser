@@ -1,3 +1,9 @@
+from enum import Enum
+
+class Format(Enum):
+    FLAT_JSON = 'flat.json'
+    JSON ='json'
+
 class SplunkFormatParserException(Exception):
     pass
 
@@ -14,7 +20,8 @@ class SplunkFormatParser:
               row_end: str =')',
               mvsep: str ='OR',
               emptystr: str ='NOT()',
-              escape_char: str ='\\') -> list:
+              escape_char: str ='\\',
+              format: Format = Format.FLAT_JSON) -> list:
         """Parse Splunk search result string from a format command into list of dictionaries.
 
         Example:
@@ -54,9 +61,10 @@ class SplunkFormatParser:
                 returned. Defaults to 'NOT()'.
             escape_char (str, optional): The value to use to escape double quotes in
                 values. Defaults to '\'.
+            format (Format, optional): The format of the parsed Splunk search result.
 
         Returns:
-            List[dict]: Parsed Splunk search result as a list of dictionaries.
+            List: Parsed Splunk search result as a list.
         """
 
         if len(escape_char) != 1:
@@ -78,11 +86,41 @@ class SplunkFormatParser:
         cls._keyword = None
         cls._iterator = iter(result)
         
-        return cls._parse_format()
+        if format == Format.FLAT_JSON:
+            return cls._parse_flat_json()
+        elif format == Format.JSON:
+            return cls._parse_json()
+        else:
+            raise SplunkFormatParserException('unsupported format "%s"' % format)
 
 
     @classmethod
-    def _parse_format(cls):
+    def _parse_json(cls):
+        results = cls._parse_flat_json()
+        for i in range(len(results)):
+            results[i] = cls._unflatten_json(results[i])
+        return results
+
+    
+    @classmethod
+    def _unflatten_json(cls, flat_json):
+        json = {}
+        for k, v in flat_json.items():
+            if not '.' in k:
+                json[k] = v
+                continue
+
+            keys = k.split('.')
+            nest_dict = json
+            for key in keys[:-1]:
+                nest_dict[key] = nest_dict.get(key, {})
+                nest_dict = nest_dict[key]
+            nest_dict[keys[-1]] = v
+        return json
+
+
+    @classmethod
+    def _parse_flat_json(cls):
         cls._next_token()
         cls._next_keyword()
         if not cls._keyword:

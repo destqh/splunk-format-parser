@@ -1,6 +1,10 @@
 import pytest
 
-from splunk_format_parser import SplunkFormatParser, SplunkFormatParserException
+from splunk_format_parser import (
+    SplunkFormatParser, 
+    SplunkFormatParserException,
+    Format
+)
 
 def test_parse_basic():
     input = '( ( host="mylaptop" ) )'
@@ -41,8 +45,8 @@ def test_parse_multivalue():
     assert actual == expected
 
 def test_quoted_key():
-    input = '( ( "host.dev"="mylaptop" AND source="syslog.log" AND "source.type"="syslog" ) )'
-    expected = [{'host.dev': 'mylaptop','source': 'syslog.log', 'source.type': 'syslog'}]
+    input = '( ( "host.dev"="mylaptop" ) )'
+    expected = [{'host.dev': 'mylaptop'}]
     actual = SplunkFormatParser.parse(input)
     assert actual == expected
 
@@ -77,7 +81,7 @@ def test_parse_custom_escape_char_double_quotes():
     assert actual == expected
 
 def test_parse_custom_sep():
-    input = '[ [ host="mylaptop" && source="syslog.log" && sourcetype="syslog" ] || '\
+    input = '[ [ host="mylaptop" && source="syslog.log" && sourcetype="syslog" ] || ' \
             '[ host="bobslaptop" && source="bob-syslog.log" && sourcetype="syslog" ] ]'
     expected = [{'host': 'mylaptop','source': 'syslog.log', 'sourcetype': 'syslog'},
                 {'host': 'bobslaptop','source': 'bob-syslog.log', 'sourcetype': 'syslog'}]
@@ -95,6 +99,48 @@ def test_parse_custom_empty():
     expected = []
     actual = SplunkFormatParser.parse(input, emptystr='None')
     assert actual == expected
+
+def test_parse_json_basic():
+    input = '( ( "host.src"="1.1.1.1" AND source="log" ) ) )'
+    expected = [{'host': {'src': '1.1.1.1'}, 'source': 'log'}]
+    actual = SplunkFormatParser.parse(input, format=Format.JSON)
+    assert actual == expected
+
+def test_parse_json_deep_nested():
+    input = '( ( "host.src.ip"="1.1.1.1" ) ) )'
+    expected = [{'host': {'src': {'ip': '1.1.1.1'}}}]
+    actual = SplunkFormatParser.parse(input, format=Format.JSON)
+    assert actual == expected
+
+def test_parse_json_multi_key():
+    input = '( ( "host.src.ip"="1.1.1.1" AND "host.dst.ip"="8.8.8.8" ) )'
+    expected = [{'host': {'src': {'ip': '1.1.1.1'}, 'dst': {'ip': '8.8.8.8'}}}]
+    actual = SplunkFormatParser.parse(input, format=Format.JSON)
+    assert actual == expected
+
+def test_parse_json_multivalue():
+    input = '( ( ( "host.src.ip"="1.1.1.1" OR "host.src.ip"="2.2.2.2") AND '\
+                '( "host.src.port"="1234" OR "host.src.port"="5678" ) AND ' \
+                   '"host.dst.ip"="8.8.8.8" AND "host.dst.port"="53" ) )'
+    expected = [{'host': {
+                    'src': {
+                        'ip': ['1.1.1.1', '2.2.2.2'], 
+                        'port': ['1234', '5678']
+                    },
+                    'dst': {
+                        'ip': '8.8.8.8',
+                        'port': '53'
+                    }}}]
+    actual = SplunkFormatParser.parse(input, format=Format.JSON)
+    assert actual == expected
+
+def test_raise_unsupported_format_exception():
+    expected = 'unsupported format "unsupported"'
+    
+    with pytest.raises(SplunkFormatParserException) as exc_info:
+        SplunkFormatParser.parse('', format='unsupported')
+    assert str(exc_info.value) == expected
+
 
 def test_raise_row_prefix_exception():
     input = '[ ( host="mylaptop" ) )'
