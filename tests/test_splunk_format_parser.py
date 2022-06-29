@@ -195,7 +195,7 @@ def test_raise_unsupported_format_exception():
 
 def test_raise_row_prefix_exception():
     input = '[ ( host="mylaptop" ) )'
-    expected = 'expected keyword "(" but found "["'
+    expected = 'expecting keyword "(" but found "[" (char 0)'
 
     with pytest.raises(SplunkFormatParserException) as exc_info:
         SplunkFormatParser.parse(input)
@@ -203,7 +203,7 @@ def test_raise_row_prefix_exception():
 
 def test_raise_row_end_exception():
     input = '( ( host="mylaptop" ) ]'
-    expected = 'expected keyword ")" but found "]"'
+    expected = 'expecting keyword ")" but found "]" (char 22)'
 
     with pytest.raises(SplunkFormatParserException) as exc_info:
         SplunkFormatParser.parse(input)
@@ -211,7 +211,7 @@ def test_raise_row_end_exception():
 
 def test_raise_col_prefix_exception():
     input = '( [ host="mylaptop" ) )'
-    expected = 'expected keyword "(" but found "["'
+    expected = 'expecting keyword "(" but found "[" (char 2)'
 
     with pytest.raises(SplunkFormatParserException) as exc_info:
         SplunkFormatParser.parse(input)
@@ -219,7 +219,7 @@ def test_raise_col_prefix_exception():
 
 def test_raise_col_end_exception():
     input = '( ( host="mylaptop" ] )'
-    expected = 'expected keyword ")" but found "]"'
+    expected = 'expecting keyword ")" but found "]" (char 20)'
 
     with pytest.raises(SplunkFormatParserException) as exc_info:
         SplunkFormatParser.parse(input)
@@ -227,7 +227,7 @@ def test_raise_col_end_exception():
 
 def test_raise_value_prefix_exception():
     input = '( ( host=\'mylaptop\' ) )'
-    expected = 'expected token """ but found "\'"'
+    expected = 'expecting token """ but found "\'" (char 9)'
 
     with pytest.raises(SplunkFormatParserException) as exc_info:
         SplunkFormatParser.parse(input)
@@ -235,7 +235,7 @@ def test_raise_value_prefix_exception():
 
 def test_raise_multivalue_end_exception():
     input = '( ( ( source="syslog.log.1" OR source="syslog.log.2" ] ) )'
-    expected = 'expected keyword ")" but found "]"'
+    expected = 'expecting keyword ")" but found "]" (char 53)'
 
     with pytest.raises(SplunkFormatParserException) as exc_info:
         SplunkFormatParser.parse(input)
@@ -243,7 +243,15 @@ def test_raise_multivalue_end_exception():
 
 def test_raise_multivalue_diff_key_exception():
     input = '( ( ( source1="syslog.log.1" OR source2="syslog.log.2" ) ) )'
-    expected = 'multivalue contains different key value: "source1" != "source2"'
+    expected = 'multivalue contains different key string: "source1" != "source2" (char 53)'
+
+    with pytest.raises(SplunkFormatParserException) as exc_info:
+        SplunkFormatParser.parse(input)
+    assert str(exc_info.value) == expected
+
+def test_raise_extra_data_exception():
+    input = '( ( host="mylaptop" ) ) )'
+    expected = 'extra data ")" (char 24)'
 
     with pytest.raises(SplunkFormatParserException) as exc_info:
         SplunkFormatParser.parse(input)
@@ -251,7 +259,7 @@ def test_raise_multivalue_diff_key_exception():
 
 def test_raise_escape_char_exception():
     input = '( ( host="&&"mylaptop&&"" ) )'
-    expected = 'escape character have to be 1 character long: "&&"'
+    expected = 'escape character can only be 1 character long: "&&"'
 
     with pytest.raises(SplunkFormatParserException) as exc_info:
         SplunkFormatParser.parse(input, escape_char='&&')

@@ -70,7 +70,7 @@ class SplunkFormatParser:
 
         if len(escape_char) != 1:
             raise SplunkFormatParserException(
-                'escape character have to be 1 character long: "%s"'
+                'escape character can only be 1 character long: "%s"'
                 % escape_char)
         
         cls._mvsep = mvsep
@@ -86,6 +86,7 @@ class SplunkFormatParser:
         cls._token = None
         cls._keyword = None
         cls._iterator = iter(result)
+        cls._char_index = -1
         cls._fields = set()
         
         if format == Format.FLAT_JSON:
@@ -145,7 +146,13 @@ class SplunkFormatParser:
         if cls._keyword == cls._emptystr:
             cls._match_token(None)
             return []
-        return cls._parse_row()
+        results = cls._parse_row()
+        
+        cls._next_keyword()
+        if cls._keyword:
+            raise SplunkFormatParserException(
+                'extra data "%s" (char %s)' % (cls._keyword, cls._char_index-1))
+        return results
     
 
     @classmethod
@@ -202,8 +209,8 @@ class SplunkFormatParser:
             key, value = cls._get_key_value()
             if key != main_key:
                 raise SplunkFormatParserException(
-                    'multivalue contains different key value: "%s" != "%s"' 
-                    % (main_key, key))
+                    'multivalue contains different key string: "%s" != "%s" (char %s)' 
+                    % (main_key, key, cls._char_index-1))
             values.append(value)
             cls._next_keyword()
         
@@ -277,19 +284,20 @@ class SplunkFormatParser:
     @classmethod
     def _next_token(cls):
         cls._token = next(cls._iterator, None)
+        cls._char_index += 1
 
 
     @classmethod
     def _match_keyword(cls, expected):
         if cls._keyword != expected:
             raise SplunkFormatParserException(
-                'expected keyword "%s" but found "%s"' 
-                % (expected, cls._keyword))
+                'expecting keyword "%s" but found "%s" (char %s)' 
+                % (expected, cls._keyword, cls._char_index-1))
 
 
     @classmethod
     def _match_token(cls, expected):
         if cls._token != expected:
             raise SplunkFormatParserException(
-                'expected token "%s" but found "%s"' 
-                % (expected, cls._token))
+                'expecting token "%s" but found "%s" (char %s)'
+                % (expected, cls._token, cls._char_index))
