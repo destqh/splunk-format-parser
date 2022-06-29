@@ -6,6 +6,8 @@ from splunk_format_parser import (
     Format
 )
 
+# Test parse flat json
+
 def test_parse_basic():
     input = '( ( host="mylaptop" ) )'
     expected = [{'host': 'mylaptop'}]
@@ -100,14 +102,30 @@ def test_parse_custom_empty():
     actual = SplunkFormatParser.parse(input, emptystr='None')
     assert actual == expected
 
+# Test parse json
+
 def test_parse_json_basic():
-    input = '( ( "host.src"="1.1.1.1" AND source="log" ) ) )'
+    input = '( ( "host.src"="1.1.1.1" ) )'
+    expected = [{'host': {'src': '1.1.1.1'}}]
+    actual = SplunkFormatParser.parse(input, format=Format.JSON)
+    assert actual == expected
+
+def test_parse_json_multi_col():
+    input = '( ( "host.src"="1.1.1.1" AND source="log" ) )'
     expected = [{'host': {'src': '1.1.1.1'}, 'source': 'log'}]
     actual = SplunkFormatParser.parse(input, format=Format.JSON)
     assert actual == expected
 
+def test_parse_json_multi_row():
+    input = '( ( "host.src"="1.1.1.1" AND source="log" ) OR ' \
+              '( "host.src"="2.2.2.2" AND source="log" ) )'
+    expected = [{'host': {'src': '1.1.1.1'}, 'source': 'log'},
+                {'host': {'src': '2.2.2.2'}, 'source': 'log'}]
+    actual = SplunkFormatParser.parse(input, format=Format.JSON)
+    assert actual == expected
+
 def test_parse_json_deep_nested():
-    input = '( ( "host.src.ip"="1.1.1.1" ) ) )'
+    input = '( ( "host.src.ip"="1.1.1.1" ) )'
     expected = [{'host': {'src': {'ip': '1.1.1.1'}}}]
     actual = SplunkFormatParser.parse(input, format=Format.JSON)
     assert actual == expected
@@ -134,13 +152,46 @@ def test_parse_json_multivalue():
     actual = SplunkFormatParser.parse(input, format=Format.JSON)
     assert actual == expected
 
+# Test parse csv
+
+def test_parse_csv_basic():
+    input = '( ( "host.src"="1.1.1.1" ) )'
+    expected = [['host.src'], ['1.1.1.1']]
+    actual = SplunkFormatParser.parse(input, format=Format.CSV)
+    assert actual == expected
+
+def test_parse_csv_multi_col():
+    input = '( ( "host.src"="1.1.1.1" AND source="log" ) )'
+    expected = [['host.src', 'source'], ['1.1.1.1', 'log']]
+    actual = SplunkFormatParser.parse(input, format=Format.CSV)
+    assert actual == expected
+
+def test_parse_csv_multi_row():
+    input = '( ( "host.src"="1.1.1.1" AND source="log" ) OR ' \
+              '( "host.src"="2.2.2.2" AND source="log" ) )'
+    expected = [['host.src', 'source'], 
+                ['1.1.1.1', 'log'], 
+                ['2.2.2.2', 'log']]
+    actual = SplunkFormatParser.parse(input, format=Format.CSV)
+    assert actual == expected
+
+def test_parse_csv_order():
+    input = '( ( "host.src"="1.1.1.1" AND source="log" ) OR ' \
+              '( source="log" AND "host.src"="2.2.2.2" ) )'
+    expected = [['host.src', 'source'], 
+                ['1.1.1.1', 'log'], 
+                ['2.2.2.2', 'log']]
+    actual = SplunkFormatParser.parse(input, format=Format.CSV)
+    assert actual == expected
+
+# Test exceptions
+
 def test_raise_unsupported_format_exception():
     expected = 'unsupported format "unsupported"'
     
     with pytest.raises(SplunkFormatParserException) as exc_info:
         SplunkFormatParser.parse('', format='unsupported')
     assert str(exc_info.value) == expected
-
 
 def test_raise_row_prefix_exception():
     input = '[ ( host="mylaptop" ) )'

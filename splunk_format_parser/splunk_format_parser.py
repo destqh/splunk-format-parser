@@ -2,7 +2,8 @@ from enum import Enum
 
 class Format(Enum):
     FLAT_JSON = 'flat.json'
-    JSON ='json'
+    JSON = 'json'
+    CSV= 'csv'
 
 class SplunkFormatParserException(Exception):
     pass
@@ -22,7 +23,7 @@ class SplunkFormatParser:
               emptystr: str ='NOT()',
               escape_char: str ='\\',
               format: Format = Format.FLAT_JSON) -> list:
-        """Parse Splunk search result string from a format command into list of dictionaries.
+        """Parse Splunk search result string from a format command into list.
 
         Example:
         Input: '( ( host="mylaptop" AND source="syslog.log" ) OR
@@ -85,13 +86,29 @@ class SplunkFormatParser:
         cls._token = None
         cls._keyword = None
         cls._iterator = iter(result)
+        cls._fields = set()
         
         if format == Format.FLAT_JSON:
             return cls._parse_flat_json()
+        elif format == Format.CSV:
+            return cls._parse_csv()
         elif format == Format.JSON:
             return cls._parse_json()
         else:
             raise SplunkFormatParserException('unsupported format "%s"' % format)
+
+
+    @classmethod
+    def _parse_csv(cls):
+        results = cls._parse_flat_json()
+        fields = sorted(cls._fields)
+        res_lst = [fields]
+        for res in results:
+            values = []
+            for field in fields:
+                values.append(res.get(field, ''))
+            res_lst.append(values)
+        return res_lst
 
 
     @classmethod
@@ -212,7 +229,9 @@ class SplunkFormatParser:
             cls._next_token()
         
         cls._next_token()
-        return ''.join(key_lst).strip('"')
+        key = ''.join(key_lst).strip('"')
+        cls._fields.add(key)
+        return key
 
 
     @classmethod
